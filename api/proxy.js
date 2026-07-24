@@ -89,16 +89,16 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Missing ?url= parameter' });
     }
 
-    // 安全校验：只允许代理 aosikazy.com 域名（可根据需要修改）
-    try {
-        const parsed = new URL(targetUrl);
-        const allowedHosts = ['aosikazy.com', 'www.aosikazy.com'];
-        if (!allowedHosts.includes(parsed.hostname)) {
-            return res.status(403).json({ error: 'Forbidden host' });
-        }
-    } catch {
-        return res.status(400).json({ error: 'Invalid URL' });
-    }
+    // // 安全校验：只允许代理 aosikazy.com 域名（可根据需要修改）
+    // try {
+    //     const parsed = new URL(targetUrl);
+    //     const allowedHosts = ['aosikazy.com', 'www.aosikazy.com'];
+    //     if (!allowedHosts.includes(parsed.hostname)) {
+    //         return res.status(403).json({ error: 'Forbidden host' });
+    //     }
+    // } catch {
+    //     return res.status(400).json({ error: 'Invalid URL' });
+    // }
 
     try {
         // 模拟浏览器请求头
