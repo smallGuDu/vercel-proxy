@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/proxy.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "routes": [
     {
       "src": "/api/proxy",
@@ -23,8 +28,8 @@
           "value": "Content-Type, Accept"
         },
         {
-          "key": "Access-Control-Max-Age",
-          "value": "86400"
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
         }
       ]
     }
