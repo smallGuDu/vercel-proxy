@@ -6,5 +6,7 @@
   "scripts": {
     "start": "node api/proxy.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  }
 }
