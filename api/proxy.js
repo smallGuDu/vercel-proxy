@@ -6,12 +6,18 @@ const iconv = require('iconv-lite');  // 🔥 需要安装
 
 module.exports = async function handler(req, res) {
     // ===== CORS设置 =====
+     // ===== 强制禁用缓存 =====
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // ===== CORS设置 =====
     const origin = req.headers.origin || '*';
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Access-Control-Max-Age', '0'); // 强制不缓存预检
     
     // ===== 处理OPTIONS =====
     if (req.method === 'OPTIONS') {
