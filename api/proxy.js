@@ -1,11 +1,8 @@
 // 文件: api/proxy.js
-// Vercel Serverless Function - 转发代理
-
 const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 
-// 解析 URL 参数
 function parseQuery(queryString) {
     const params = new URLSearchParams(queryString);
     const result = {};
@@ -15,7 +12,6 @@ function parseQuery(queryString) {
     return result;
 }
 
-// 核心请求函数 (带自动解压)
 function fetchWithNode(url, headers) {
     return new Promise((resolve, reject) => {
         const urlObj = new URL(url);
@@ -66,54 +62,46 @@ function fetchWithNode(url, headers) {
     });
 }
 
-// Vercel 入口
 module.exports = async function handler(req, res) {
-    // 设置 CORS 头
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // 增强的 CORS 设置
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
     
     // 处理预检请求
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // 只允许 GET 请求
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // 获取目标 URL 参数
     const { url: targetUrl } = req.query;
     if (!targetUrl) {
         return res.status(400).json({ error: 'Missing ?url= parameter' });
     }
 
-    // // 安全校验：只允许代理 aosikazy.com 域名（可根据需要修改）
-    // try {
-    //     const parsed = new URL(targetUrl);
-    //     const allowedHosts = ['aosikazy.com', 'www.aosikazy.com'];
-    //     if (!allowedHosts.includes(parsed.hostname)) {
-    //         return res.status(403).json({ error: 'Forbidden host' });
-    //     }
-    // } catch {
-    //     return res.status(400).json({ error: 'Invalid URL' });
-    // }
-
     try {
-        // 模拟浏览器请求头
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
-            'Referer': 'https://aosikazy.com/',
+            'Referer': 'https://hongniuzy.net/',
             'Cache-Control': 'no-cache',
         };
 
         const response = await fetchWithNode(targetUrl, headers);
         
-        // 返回获取到的内容
+        // 转发原始内容类型
+        if (response.headers['content-type']) {
+            res.setHeader('Content-Type', response.headers['content-type']);
+        }
+        
         res.status(response.statusCode).send(response.body);
         
     } catch (error) {
