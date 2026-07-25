@@ -1,26 +1,28 @@
 // api/proxy.js
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');  // 🔥 添加这个
+const iconv = require('iconv-lite');  // 🔥 需要安装
 
 module.exports = async function handler(req, res) {
-    // ===== 1. 先设置CORS（最高优先级） =====
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // ===== CORS设置 =====
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400');
     
-    // ===== 2. 立即处理OPTIONS =====
+    // ===== 处理OPTIONS =====
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
     }
     
-    // ===== 3. 只允许GET =====
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
     
-    // ===== 4. 获取目标URL =====
     const targetUrl = req.query.url;
     if (!targetUrl) {
         return res.status(400).json({ error: 'Missing ?url= parameter' });
@@ -39,7 +41,7 @@ module.exports = async function handler(req, res) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate, br',  // 接受压缩
                 'Referer': 'https://hongniuzy.net/',
             },
             timeout: 15000,
@@ -47,13 +49,13 @@ module.exports = async function handler(req, res) {
         
         const response = await new Promise((resolve, reject) => {
             const req = protocol.request(options, (res) => {
-                let data = '';
-                res.on('data', (chunk) => data += chunk);
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
                 res.on('end', () => {
                     resolve({
                         statusCode: res.statusCode,
                         headers: res.headers,
-                        body: data
+                        body: Buffer.concat(chunks)  // 🔥 返回Buffer而不是字符串
                     });
                 });
             });
@@ -65,22 +67,51 @@ module.exports = async function handler(req, res) {
             req.end();
         });
         
-        // ===== 5. 再次确保CORS头存在（关键！） =====
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+        // ===== 🔥 关键：解压和编码转换 =====
+        let bodyBuffer = response.body;
+        const encoding = response.headers['content-encoding'];
         
-        // 转发内容类型
-        if (response.headers['content-type']) {
-            res.setHeader('Content-Type', response.headers['content-type']);
+        // 1. 解压
+        try {
+            if (encoding === 'gzip') {
+                bodyBuffer = zlib.gunzipSync(bodyBuffer);
+            } else if (encoding === 'deflate') {
+                bodyBuffer = zlib.inflateSync(bodyBuffer);
+            } else if (encoding === 'br') {
+                bodyBuffer = zlib.brotliDecompressSync(bodyBuffer);
+            }
+        } catch (err) {
+            console.error('解压失败:', err.message);
         }
         
-        res.status(response.statusCode).send(response.body);
+        // 2. 检测编码并转换
+        let html = bodyBuffer.toString('utf8');
+        
+        // 如果UTF-8解码后还有乱码，尝试GBK
+        if (html.includes('�') || html.includes('��')) {
+            try {
+                // 需要安装: npm install iconv-lite
+                html = iconv.decode(bodyBuffer, 'gbk');
+            } catch (err) {
+                // 如果没有iconv-lite，尝试gb2312
+                try {
+                    html = iconv.decode(bodyBuffer, 'gb2312');
+                } catch (e) {
+                    console.error('编码转换失败:', e.message);
+                }
+            }
+        }
+        
+        // 3. 设置正确的Content-Type
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        
+        console.log(`✅ 请求成功，长度: ${html.length}`);
+        res.status(response.statusCode).send(html);
         
     } catch (error) {
-        console.error('代理错误:', error.message);
-        // 错误响应也要加CORS
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        console.error('❌ 代理错误:', error.message);
+        res.setHeader('Access-Control-Allow-Origin', origin);
         res.status(502).json({ 
             error: 'Proxy failed', 
             message: error.message 
